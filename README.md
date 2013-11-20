@@ -9,7 +9,7 @@ Usage
 /usr/local/nagios/plugins/check_btcpool -p bitcoin.cz -c500 -w 1000 -a 394472-8aed2a17ae0f5339e9b98866210c2aa3
 
 
-Nagios Example Conifig
+Nagios Example Config
 ======================
 define command{
   command_name    check_btcpool
