@@ -1,50 +1,83 @@
 #!/usr/bin/python
 import urllib, json, sys 
-import argparse
-parser = argparse.ArgumentParser(description='Nagios plugin to monitor hashrate on Bitcoin mining pools')
-parser.add_argument('-p', dest='pool', help='Bitcoin mining pool, currently supported coinotron & bitcoin.cz', required=True)
-parser.add_argument('-a', dest='api_key', help='API key for your Bitcoin mining account', required=True)
-parser.add_argument('-w', dest='warning', help='Warning threshold', required=True)
-parser.add_argument('-c', dest='critical', help='Critical threshold', required=True)
-args = parser.parse_args()
+import optparse
+parser = optparse.OptionParser(description='Nagios plugin to monitor hashrate on Bitcoin mining pools')
+parser.add_option('-p', dest='pool', help='Bitcoin mining pool, currently supported btcguild, coinhuntr, coinotron & bitcoin.cz', default=None)
+parser.add_option('-a', dest='api_key', help='API key for your Bitcoin mining account', default=None)
+parser.add_option('-w', dest='warning', help='Warning threshold [MH/s]', default=None)
+parser.add_option('-c', dest='critical', help='Critical threshold [MH/s]', default=None)
+(options, args) = parser.parse_args()
 
-warning = float(args.warning)
-critical = float(args.critical)
+warning = float(options.warning)
+critical = float(options.critical)
 
+unpaid = None
+hashrate = None
 
 def get_hashrate(pool, api_key):
+  global unpaid, hashrate
+
   if pool ==  'bitcoin.cz':
     url = 'https://mining.bitcoin.cz/accounts/profile/json/'+api_key
     result = urllib.urlopen(url)
     data = json.load(result)
-    #print json.dumps(data)
     return float(data["hashrate"])
   elif pool ==  'coinotron':
     url = 'https://www.coinotron.com/coinotron/AccountServlet?action=api&api_key='+api_key
     result = urllib.urlopen(url)
     data = json.load(result)
-    hashrate=0.0
+    hashrate = 0.0
     for i in data["workers"]:
       hashrate =+ float(data["workers"][i]["hashrate"])
     return hashrate
-  else: 
-    print "UKNOWN - %s unknown pool." % pool 
+  elif pool == 'btcguild':
+    # BTCGuild dissallows access with standart Python User-Agent
+    from urllib import FancyURLopener
+    class BtcguildOpener(FancyURLopener, object):
+      version = 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:25.0) Gecko/20100101 Firefox/25.0'
+
+    url = 'https://www.btcguild.com/api.php?api_key='+api_key
+    btcguild = BtcguildOpener()
+    result = btcguild.open(url)
+    try:
+      data = json.load(result)
+    except:
+      return "Unreadable output. Wait 15 seconds. ?"
+    else:
+      unpaid = float(data['user']['unpaid_rewards'])
+      hashrate = 0.0
+      for worker in data['workers']:
+        hashrate += float(data['workers'][worker]['hash_rate'])
+      return hashrate
+  elif pool ==  'coinhuntr':
+    url = 'https://www.coinhuntr.com/index.php?page=api&action=getuserstatus&api_key='+api_key
+    result = urllib.urlopen(url)
+    data = json.load(result)
+    return float(data["getuserstatus"]["data"]["hashrate"])
+  else:
+    print "UKNOWN - %s unknown pool." % pool
     sys.exit(3)
 
 
-current_hashrate = get_hashrate(args.pool, args.api_key)
+current_hashrate = get_hashrate(options.pool, options.api_key)
+
+unpaid_info = ''
+if isinstance(unpaid, float) is True:
+  unpaid_info = "Unpaid rewards: %s XBT." % unpaid
+
 if isinstance(current_hashrate, float) == False:
-        print "UKNOWN - %s MHs hashrate." % current_hashrate
-        sys.exit(3)
+  print "UKNOWN - %s MHs hashrate. %s" % (current_hashrate, unpaid_info)
+  sys.exit(3)
 elif current_hashrate > warning:
-        print "OK - %s MHs hashrate." % current_hashrate
-        sys.exit(0)
+  print "OK - %s MHs hashrate. %s" % (current_hashrate, unpaid_info)
+  sys.exit(0)
 elif current_hashrate >= critical:
-        print "WARNING - %s MHs hashrate." % current_hashrate
-        sys.exit(1)
+  print "WARNING - %s MHs hashrate. %s" % (current_hashrate, unpaid_info)
+  sys.exit(1)
 elif current_hashrate < critical:
-        print "CRITICAL - %s MHs hashrate." % current_hashrate
-        sys.exit(2)
+  print "CRITICAL - %s MHs hashrate. %s" % (current_hashrate, unpaid_info)
+  sys.exit(2)
 else:
-        print "UKNOWN - %s MHs hashrate." % current_hashrate
-        sys.exit(3)
+  print "UKNOWN - %s MHs hashrate. %s" % (current_hashrate, unpaid_info)
+  sys.exit(3)
+
