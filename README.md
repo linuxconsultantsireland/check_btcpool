@@ -2,7 +2,7 @@ check_btcpool
 =============
 
 Nagios plugin to monitor your hashrate on a number of bitcoin and litecoin mining pools.
-Current supportes btcguild, coinhuntr, coinotron & bitcoin.cz mining pools. 
+Currently supportes btcguild, coinhuntr, coinotron & bitcoin.cz mining pools. 
 
 Usage
 =====
