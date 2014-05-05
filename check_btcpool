@@ -84,6 +84,7 @@ def get_hashrate(pool, api_key, username=None, secret=None):
     else:
       unpaid = float(data_balance["BTC"]["available"])
       return float(data_rate["last5m"])
+
   elif pool ==  'coinhuntr':
     url = 'https://www.coinhuntr.com/index.php?page=api&action=getuserstatus&api_key='+api_key
     result = urllib.urlopen(url)
