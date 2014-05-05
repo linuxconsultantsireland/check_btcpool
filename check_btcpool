@@ -2,8 +2,12 @@
 import urllib, json, sys 
 import optparse
 parser = optparse.OptionParser(description='Nagios plugin to monitor hashrate on Bitcoin mining pools')
-parser.add_option('-p', dest='pool', help='Bitcoin mining pool, currently supported btcguild, coinhuntr, coinotron & bitcoin.cz', default=None)
+parser.add_option('-p', dest='pool',
+    help="Bitcoin mining pool. Currently supported: 'bitcoin.cz', 'btcguild', 'coinotron', 'ghash.io'",
+    default=None)
 parser.add_option('-a', dest='api_key', help='API key for your Bitcoin mining account', default=None)
+parser.add_option('-u', dest='username', help='Username for your Bitcoin mining account (req. for ghash.io)', default=None)
+parser.add_option('-s', dest='secret', help='Secret for your Bitcoin mining account (req. for ghash.io)', default=None)
 parser.add_option('-w', dest='warning', help='Warning threshold [MH/s]', default=None)
 parser.add_option('-c', dest='critical', help='Critical threshold [MH/s]', default=None)
 (options, args) = parser.parse_args()
@@ -14,7 +18,7 @@ critical = float(options.critical)
 unpaid = None
 hashrate = None
 
-def get_hashrate(pool, api_key):
+def get_hashrate(pool, api_key, username=None, secret=None):
   global unpaid, hashrate
 
   if pool ==  'bitcoin.cz':
@@ -22,6 +26,7 @@ def get_hashrate(pool, api_key):
     result = urllib.urlopen(url)
     data = json.load(result)
     return float(data["hashrate"])
+
   elif pool ==  'coinotron':
     url = 'https://www.coinotron.com/coinotron/AccountServlet?action=api&api_key='+api_key
     result = urllib.urlopen(url)
@@ -30,6 +35,7 @@ def get_hashrate(pool, api_key):
     for i in data["workers"]:
       hashrate =+ float(data["workers"][i]["hashrate"])
     return hashrate
+
   elif pool == 'btcguild':
     # BTCGuild dissallows access with standart Python User-Agent
     from urllib import FancyURLopener
@@ -49,17 +55,48 @@ def get_hashrate(pool, api_key):
       for worker in data['workers']:
         hashrate += float(data['workers'][worker]['hash_rate'])
       return hashrate
+
+  elif pool == 'ghash.io':
+    from urllib import FancyURLopener
+    class GhashioOpener(FancyURLopener, object):
+      version = 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:25.0) Gecko/20100101 Firefox/25.0'
+
+    # Details: https://cex.io/api
+    from time import time
+    import hmac, hashlib
+    def generateParams():
+      nonce = str(int(time()*1000000))
+      message = nonce + username + api_key
+      signature = hmac.new(secret, msg=message, digestmod=hashlib.sha256).hexdigest().upper() 
+      params = {'key':api_key, 'nonce':nonce, 'signature':signature}
+      return params
+
+    ghashio = GhashioOpener()
+    url = 'https://cex.io/api/ghash.io/hashrate'
+    result_rate = ghashio.open(url, urllib.urlencode(generateParams()))
+    url = 'https://cex.io/api/balance/'
+    result_balance = ghashio.open(url, urllib.urlencode(generateParams()))
+    try:
+      data_rate = json.loads(''.join(result_rate.readlines()))
+      data_balance = json.loads(''.join(result_balance.readlines()))
+    except:
+      return "Unreadable output. Wait 15 seconds. ?"
+    else:
+      unpaid = float(data_balance["BTC"]["available"])
+      return float(data_rate["last5m"])
   elif pool ==  'coinhuntr':
     url = 'https://www.coinhuntr.com/index.php?page=api&action=getuserstatus&api_key='+api_key
     result = urllib.urlopen(url)
     data = json.load(result)
     return float(data["getuserstatus"]["data"]["hashrate"])
+
   else:
     print "UKNOWN - %s unknown pool." % pool
     sys.exit(3)
 
 
-current_hashrate = get_hashrate(options.pool, options.api_key)
+current_hashrate = get_hashrate(options.pool, options.api_key,
+    options.username, options.secret)
 
 unpaid_info = ''
 if isinstance(unpaid, float) is True:
