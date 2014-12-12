@@ -1,5 +1,9 @@
 #!/usr/bin/python
-import urllib, json, sys 
+#
+# Newest version available at:
+#   https://github.com/cryptogopher/check_btcpool
+
+import urllib, json, sys
 import optparse
 parser = optparse.OptionParser(description='Nagios plugin to monitor hashrate on Bitcoin mining pools')
 parser.add_option('-p', dest='pool',
