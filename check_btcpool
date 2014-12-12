@@ -83,7 +83,7 @@ def get_hashrate(pool, api_key, username=None, secret=None):
       return "Unreadable output. Wait 15 seconds. ?"
     else:
       unpaid = float(data_balance["BTC"]["available"])
-      return float(data_rate["last5m"])
+      return float(data_rate["last15m"])
 
   elif pool ==  'coinhuntr':
     url = 'https://www.coinhuntr.com/index.php?page=api&action=getuserstatus&api_key='+api_key
@@ -99,23 +99,23 @@ def get_hashrate(pool, api_key, username=None, secret=None):
 current_hashrate = get_hashrate(options.pool, options.api_key,
     options.username, options.secret)
 
-unpaid_info = ''
-if isinstance(unpaid, float) is True:
-  unpaid_info = "Unpaid rewards: %s XBT." % unpaid
+status = "- %s MHs hashrate.%s" % (
+        current_hashrate if isinstance(current_hashrate, float) else "??",
+        " Unpaid rewards: %s XBT.|unpaid=%s" % (unpaid, unpaid) if isinstance(unpaid, float) else "")
 
 if isinstance(current_hashrate, float) == False:
-  print "UKNOWN - %s MHs hashrate. %s" % (current_hashrate, unpaid_info)
+  print "UKNOWN", status
   sys.exit(3)
 elif current_hashrate > warning:
-  print "OK - %s MHs hashrate. %s" % (current_hashrate, unpaid_info)
+  print "OK", status
   sys.exit(0)
 elif current_hashrate >= critical:
-  print "WARNING - %s MHs hashrate. %s" % (current_hashrate, unpaid_info)
+  print "WARNING", status
   sys.exit(1)
 elif current_hashrate < critical:
-  print "CRITICAL - %s MHs hashrate. %s" % (current_hashrate, unpaid_info)
+  print "CRITICAL", status
   sys.exit(2)
 else:
-  print "UKNOWN - %s MHs hashrate. %s" % (current_hashrate, unpaid_info)
+  print "UKNOWN", status
   sys.exit(3)
 
